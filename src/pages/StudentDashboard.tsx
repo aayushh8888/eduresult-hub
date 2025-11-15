@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download, LogOut, FileText } from "lucide-react";
+import { Download, LogOut, FileText, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 // Mock data
@@ -53,9 +53,14 @@ const StudentDashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Student Portal</h1>
-            <p className="text-sm text-muted-foreground">PRN: {studentData.prn}</p>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/login")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Student Portal</h1>
+              <p className="text-sm text-muted-foreground">PRN: {studentData.prn}</p>
+            </div>
           </div>
           <Button variant="outline" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />

@@ -6,25 +6,47 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GraduationCap } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isSignup, setIsSignup] = useState(false);
+  
   const [studentPrn, setStudentPrn] = useState("");
   const [studentGoogleId, setStudentGoogleId] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
+  const [studentName, setStudentName] = useState("");
+  
   const [facultyEmail, setFacultyEmail] = useState("");
   const [facultyPassword, setFacultyPassword] = useState("");
+  const [facultyName, setFacultyName] = useState("");
+  
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
 
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSignup) {
+      // TODO: Add signup logic
+      toast({
+        title: "Account Created",
+        description: "Your student account has been created successfully.",
+      });
+    }
     // TODO: Add authentication logic
     navigate("/student/dashboard");
   };
 
-  const handleFacultyLogin = (e: React.FormEvent) => {
+  const handleFacultySubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSignup) {
+      // TODO: Add signup logic
+      toast({
+        title: "Account Created",
+        description: "Your faculty account has been created successfully.",
+      });
+    }
     // TODO: Add authentication logic
     navigate("/faculty/dashboard");
   };
@@ -56,7 +78,31 @@ const Login = () => {
             </TabsList>
 
             <TabsContent value="student">
-              <form onSubmit={handleStudentLogin} className="space-y-4">
+              <div className="mb-4 flex justify-end">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setIsSignup(!isSignup)}
+                  className="text-primary"
+                >
+                  {isSignup ? "Already have an account? Login" : "New user? Sign up"}
+                </Button>
+              </div>
+              <form onSubmit={handleStudentSubmit} className="space-y-4">
+                {isSignup && (
+                  <div className="space-y-2">
+                    <Label htmlFor="student-name">Full Name</Label>
+                    <Input
+                      id="student-name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={studentName}
+                      onChange={(e) => setStudentName(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="student-prn">PRN (13 digits)</Label>
                   <Input
@@ -92,13 +138,37 @@ const Login = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full">
-                  Login as Student
+                  {isSignup ? "Sign Up as Student" : "Login as Student"}
                 </Button>
               </form>
             </TabsContent>
 
             <TabsContent value="faculty">
-              <form onSubmit={handleFacultyLogin} className="space-y-4">
+              <div className="mb-4 flex justify-end">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setIsSignup(!isSignup)}
+                  className="text-primary"
+                >
+                  {isSignup ? "Already have an account? Login" : "New user? Sign up"}
+                </Button>
+              </div>
+              <form onSubmit={handleFacultySubmit} className="space-y-4">
+                {isSignup && (
+                  <div className="space-y-2">
+                    <Label htmlFor="faculty-name">Full Name</Label>
+                    <Input
+                      id="faculty-name"
+                      type="text"
+                      placeholder="Enter your full name"
+                      value={facultyName}
+                      onChange={(e) => setFacultyName(e.target.value)}
+                      required
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="faculty-email">Email</Label>
                   <Input
@@ -122,7 +192,7 @@ const Login = () => {
                   />
                 </div>
                 <Button type="submit" className="w-full">
-                  Login as Faculty
+                  {isSignup ? "Sign Up as Faculty" : "Login as Faculty"}
                 </Button>
               </form>
             </TabsContent>
