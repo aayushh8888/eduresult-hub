@@ -46,6 +46,7 @@ export const SemesterDeclaration = () => {
   const { toast } = useToast();
   const [selectedYear, setSelectedYear] = useState("2");
   const [selectedSemester, setSelectedSemester] = useState("1");
+  const [selectedSubject, setSelectedSubject] = useState("");
   const [marksData, setMarksData] = useState(mockSemesterData);
   const [isDeclared, setIsDeclared] = useState(false);
 
@@ -59,7 +60,7 @@ export const SemesterDeclaration = () => {
   // Get unique subjects for the selected semester
   const subjects = useMemo(() => {
     const uniqueSubjects = [...new Set(filteredData.map(item => item.subjectCode))];
-    return uniqueSubjects.map(code => {
+    const subjectList = uniqueSubjects.map(code => {
       const subjectData = filteredData.find(item => item.subjectCode === code);
       return {
         code,
@@ -67,19 +68,32 @@ export const SemesterDeclaration = () => {
         credits: subjectData?.credits || 0
       };
     });
-  }, [filteredData]);
+    
+    // Set first subject as default if not selected
+    if (subjectList.length > 0 && !selectedSubject) {
+      setSelectedSubject(subjectList[0].code);
+    }
+    
+    return subjectList;
+  }, [filteredData, selectedSubject]);
 
-  // Get unique students
+  // Filter data by selected subject
+  const subjectFilteredData = useMemo(() => {
+    if (!selectedSubject) return filteredData;
+    return filteredData.filter(item => item.subjectCode === selectedSubject);
+  }, [filteredData, selectedSubject]);
+
+  // Get unique students for the selected subject
   const students = useMemo(() => {
-    const uniqueStudents = [...new Set(filteredData.map(item => item.prn))];
+    const uniqueStudents = [...new Set(subjectFilteredData.map(item => item.prn))];
     return uniqueStudents.map(prn => {
-      const studentData = filteredData.find(item => item.prn === prn);
+      const studentData = subjectFilteredData.find(item => item.prn === prn);
       return {
         prn,
         name: studentData?.name || ""
       };
     });
-  }, [filteredData]);
+  }, [subjectFilteredData]);
 
   // Check if all marks are complete
   const isAllMarksComplete = useMemo(() => {
@@ -183,7 +197,7 @@ export const SemesterDeclaration = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Year</label>
               <Select value={selectedYear} onValueChange={setSelectedYear} disabled={isDeclared}>
@@ -208,6 +222,22 @@ export const SemesterDeclaration = () => {
                 <SelectContent>
                   <SelectItem value="1">Semester 1</SelectItem>
                   <SelectItem value="2">Semester 2</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Subject</label>
+              <Select value={selectedSubject} onValueChange={setSelectedSubject} disabled={isDeclared}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects.map(subject => (
+                    <SelectItem key={subject.code} value={subject.code}>
+                      {subject.code} - {subject.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -301,9 +331,9 @@ export const SemesterDeclaration = () => {
       {/* Marks Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Student Marks</CardTitle>
+          <CardTitle>Student Marks - {selectedSubject}</CardTitle>
           <CardDescription>
-            Enter missing END-sem marks for students below
+            Enter missing END-sem marks for students in this subject
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -313,7 +343,6 @@ export const SemesterDeclaration = () => {
                 <TableRow className="bg-muted/50">
                   <TableHead className="font-semibold">PRN</TableHead>
                   <TableHead className="font-semibold">Student Name</TableHead>
-                  <TableHead className="font-semibold">Subject</TableHead>
                   <TableHead className="text-center font-semibold">CA1 (10)</TableHead>
                   <TableHead className="text-center font-semibold">CA2 (10)</TableHead>
                   <TableHead className="text-center font-semibold">MID (20)</TableHead>
@@ -322,16 +351,10 @@ export const SemesterDeclaration = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.map((item) => (
+                {subjectFilteredData.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-mono text-sm">{item.prn}</TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="font-medium">{item.subjectCode}</div>
-                        <div className="text-muted-foreground">{item.subject}</div>
-                      </div>
-                    </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline">{item.ca1}</Badge>
                     </TableCell>
