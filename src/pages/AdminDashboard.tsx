@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SemesterDeclaration } from "@/components/SemesterDeclaration";
 
 // Mock data
 const adminData = {
@@ -247,8 +248,12 @@ const AdminDashboard = () => {
         </div>
 
         {/* Main Tabs */}
-        <Tabs defaultValue="marks" className="space-y-6">
+        <Tabs defaultValue="declare" className="space-y-6">
           <TabsList className="bg-card border shadow-sm">
+            <TabsTrigger value="declare" className="gap-2">
+              <Award className="h-4 w-4" />
+              Declare Semester
+            </TabsTrigger>
             <TabsTrigger value="marks" className="gap-2">
               <FileText className="h-4 w-4" />
               Marks Management
@@ -262,6 +267,11 @@ const AdminDashboard = () => {
               User Management
             </TabsTrigger>
           </TabsList>
+
+          {/* Declare Semester Tab */}
+          <TabsContent value="declare">
+            <SemesterDeclaration />
+          </TabsContent>
 
           {/* Marks Management Tab */}
           <TabsContent value="marks" className="space-y-6">
