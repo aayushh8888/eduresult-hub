@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,7 +14,8 @@ import {
   BookPlus, 
   Award,
   TrendingUp,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SemesterDeclaration } from "@/components/SemesterDeclaration";
+import { supabase } from "@/integrations/supabase/client";
 
 // Mock data
 const adminData = {
@@ -106,6 +108,49 @@ const AdminDashboard = () => {
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState("all");
   const [selectedSemester, setSelectedSemester] = useState("all");
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Form state for create user
+  const [newUser, setNewUser] = useState({
+    role: "",
+    name: "",
+    email: "",
+    prn: "",
+    year: "",
+    semester: "",
+    department: ""
+  });
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const { data: profilesData, error } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          user_roles (role),
+          students (roll_number, year, semester),
+          faculty (department)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setUsers(profilesData || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     toast({
@@ -174,12 +219,117 @@ const AdminDashboard = () => {
     setIsAllocateOpen(false);
   };
 
-  const handleCreateUser = () => {
-    toast({
-      title: "User Created",
-      description: "User account has been created and email sent with temporary password.",
-    });
-    setIsCreateUserOpen(false);
+  const handleCreateUser = async () => {
+    try {
+      if (!newUser.role || !newUser.name || !newUser.email) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (newUser.role === "student" && !newUser.prn) {
+        toast({
+          title: "Validation Error",
+          description: "PRN is required for students",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUser.email,
+        password: Math.random().toString(36).slice(-8), // Temporary password
+        options: {
+          data: {
+            full_name: newUser.name,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error("User creation failed");
+
+      // Add role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert([{ user_id: authData.user.id, role: newUser.role as any }]);
+
+      if (roleError) throw roleError;
+
+      // Add student-specific data
+      if (newUser.role === "student") {
+        const { error: studentError } = await supabase
+          .from('students')
+          .insert({
+            user_id: authData.user.id,
+            roll_number: newUser.prn,
+            year: parseInt(newUser.year),
+            semester: parseInt(newUser.semester),
+          });
+
+        if (studentError) throw studentError;
+      }
+
+      // Add faculty-specific data
+      if (newUser.role === "faculty") {
+        const { error: facultyError } = await supabase
+          .from('faculty')
+          .insert({
+            user_id: authData.user.id,
+            department: newUser.department,
+          });
+
+        if (facultyError) throw facultyError;
+      }
+
+      toast({
+        title: "User Created",
+        description: "User account has been created successfully.",
+      });
+
+      setNewUser({
+        role: "",
+        name: "",
+        email: "",
+        prn: "",
+        year: "",
+        semester: "",
+        department: ""
+      });
+      setIsCreateUserOpen(false);
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const { error } = await supabase.auth.admin.deleteUser(userId);
+
+      if (error) throw error;
+
+      toast({
+        title: "User Deleted",
+        description: "User has been successfully removed.",
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -526,7 +676,7 @@ const AdminDashboard = () => {
                       <div className="space-y-4 py-4">
                         <div className="space-y-2">
                           <Label>User Type</Label>
-                          <Select>
+                          <Select value={newUser.role} onValueChange={(value) => setNewUser({...newUser, role: value})}>
                             <SelectTrigger>
                               <SelectValue placeholder="Select role" />
                             </SelectTrigger>
@@ -539,16 +689,72 @@ const AdminDashboard = () => {
                         </div>
                         <div className="space-y-2">
                           <Label>Name</Label>
-                          <Input placeholder="Full name" />
+                          <Input 
+                            placeholder="Full name" 
+                            value={newUser.name}
+                            onChange={(e) => setNewUser({...newUser, name: e.target.value})}
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>Email</Label>
-                          <Input type="email" placeholder="user@university.edu" />
+                          <Input 
+                            type="email" 
+                            placeholder="user@university.edu" 
+                            value={newUser.email}
+                            onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                          />
                         </div>
-                        <div className="space-y-2">
-                          <Label>PRN (Student only)</Label>
-                          <Input placeholder="13-digit PRN" maxLength={13} />
-                        </div>
+                        {newUser.role === "student" && (
+                          <>
+                            <div className="space-y-2">
+                              <Label>PRN</Label>
+                              <Input 
+                                placeholder="13-digit PRN" 
+                                maxLength={13} 
+                                value={newUser.prn}
+                                onChange={(e) => setNewUser({...newUser, prn: e.target.value})}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>Year</Label>
+                                <Select value={newUser.year} onValueChange={(value) => setNewUser({...newUser, year: value})}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select year" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1">Year 1</SelectItem>
+                                    <SelectItem value="2">Year 2</SelectItem>
+                                    <SelectItem value="3">Year 3</SelectItem>
+                                    <SelectItem value="4">Year 4</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Semester</Label>
+                                <Select value={newUser.semester} onValueChange={(value) => setNewUser({...newUser, semester: value})}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select semester" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="1">Semester 1</SelectItem>
+                                    <SelectItem value="2">Semester 2</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {newUser.role === "faculty" && (
+                          <div className="space-y-2">
+                            <Label>Department</Label>
+                            <Input 
+                              placeholder="Department name" 
+                              value={newUser.department}
+                              onChange={(e) => setNewUser({...newUser, department: e.target.value})}
+                            />
+                          </div>
+                        )}
                       </div>
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" onClick={() => setIsCreateUserOpen(false)}>Cancel</Button>
@@ -568,24 +774,56 @@ const AdminDashboard = () => {
                         <TableHead className="font-semibold">Role</TableHead>
                         <TableHead className="font-semibold">Details</TableHead>
                         <TableHead className="font-semibold">Created</TableHead>
+                        <TableHead className="font-semibold">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentUsers.map((user) => (
-                        <TableRow key={user.id} className="hover:bg-muted/50">
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                          <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{user.role}</Badge>
+                      {loading ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            Loading users...
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {user.role === "Student" && `PRN: ${user.prn}`}
-                            {user.role === "Faculty" && `Dept: ${user.department}`}
-                            {user.role === "Admin" && "Full Access"}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">{user.createdAt}</TableCell>
                         </TableRow>
-                      ))}
+                      ) : users.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No users found. Create your first user to get started.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        users.map((user) => {
+                          const role = user.user_roles?.[0]?.role || 'Unknown';
+                          const details = user.students?.[0] 
+                            ? `PRN: ${user.students[0].roll_number}`
+                            : user.faculty?.[0]
+                            ? `Dept: ${user.faculty[0].department || 'N/A'}`
+                            : 'Full Access';
+
+                          return (
+                            <TableRow key={user.id} className="hover:bg-muted/50">
+                              <TableCell className="font-medium">{user.full_name}</TableCell>
+                              <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="capitalize">{role}</Badge>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{details}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {new Date(user.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
